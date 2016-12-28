@@ -51,6 +51,11 @@ type AppSettings struct {
 	inputRAWTrackResponse bool
 	inputRAWRealIPHeader  string
 
+	inputS3        MultiOption
+	inputS3Config  S3InputConfig
+	outputS3       MultiOption
+	outputS3Config S3OutputConfig
+
 	middleware string
 
 	inputHTTP  MultiOption
@@ -98,6 +103,15 @@ func init() {
 	flag.Var(&Settings.outputFile, "output-file", "Write incoming requests to file: \n\tgor --input-raw :80 --output-file ./requests.gor")
 	flag.DurationVar(&Settings.outputFileConfig.flushInterval, "output-file-flush-interval", time.Second, "Interval for forcing buffer flush to the file, default: 1s.")
 	flag.BoolVar(&Settings.outputFileConfig.append, "output-file-append", false, "The flushed chunk is appended to existence file or not. ")
+
+	flag.Var(&Settings.inputS3, "input-s3", "Read requests from s3: \n\tgor --input-raw :80 --output-s3 ./requests.gor")
+	flag.StringVar(&Settings.inputS3Config.bucket, "input-s3-bucket", "", "bucket to write data too")
+	flag.StringVar(&Settings.inputS3Config.region, "input-s3-region", "us-east-1", "AWS Region")
+
+	flag.Var(&Settings.outputS3, "output-s3", "Write incoming requests to s3: \n\tgor --input-raw :80 --output-s3 ./requests.gor")
+	flag.DurationVar(&Settings.outputS3Config.flushInterval, "output-s3-flush-interval", time.Second, "Interval for forcing buffer flush to the file, default: 1s.")
+	flag.StringVar(&Settings.outputS3Config.bucket, "output-s3-bucket", "", "bucket to write data too")
+	flag.StringVar(&Settings.outputS3Config.region, "output-s3-region", "us-east-1", "AWS Region")
 
 	// Set default
 	Settings.outputFileConfig.sizeLimit.Set("32mb")

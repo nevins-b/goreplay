@@ -126,6 +126,14 @@ func InitPlugins() {
 		registerPlugin(NewFileOutput, options, &Settings.outputFileConfig)
 	}
 
+	for _, options := range Settings.inputS3 {
+		registerPlugin(NewS3Input, options)
+	}
+
+	for _, options := range Settings.outputS3 {
+		registerPlugin(NewS3Output, options, &Settings.outputS3Config)
+	}
+
 	for _, options := range Settings.inputHTTP {
 		registerPlugin(NewHTTPInput, options)
 	}
