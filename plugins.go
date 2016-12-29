@@ -127,7 +127,7 @@ func InitPlugins() {
 	}
 
 	for _, options := range Settings.inputS3 {
-		registerPlugin(NewS3Input, options)
+		registerPlugin(NewS3Input, options, &Settings.inputS3Config)
 	}
 
 	for _, options := range Settings.outputS3 {

@@ -62,8 +62,9 @@ func NewS3Output(keyTemplate string, config *S3OutputConfig) *S3Output {
 	o := new(S3Output)
 	o.keyTemplate = keyTemplate
 	o.config = config
-	o.createClient()
 	o.updateName()
+
+	o.createClient()
 
 	if strings.Contains(keyTemplate, "%r") {
 		o.requestPerFile = true
@@ -82,7 +83,7 @@ func NewS3Output(keyTemplate string, config *S3OutputConfig) *S3Output {
 func (o *S3Output) createClient() {
 	sess, err := session.NewSession()
 	if err != nil {
-		panic(err)
+		log.Fatal(o, "Could not create Session. Error: %s", err)
 	}
 
 	e := ec2metadata.New(sess)
@@ -98,8 +99,7 @@ func (o *S3Output) createClient() {
 
 	sess.Config.Credentials = creds
 
-	svc := s3.New(sess, &aws.Config{Region: &o.config.region})
-	o.svc = svc
+	o.svc = s3.New(sess, &aws.Config{Region: &o.config.region})
 }
 
 func (o *S3Output) filename() string {
@@ -165,6 +165,7 @@ func (o *S3Output) Write(data []byte) (n int, err error) {
 		o.Close()
 		o.key = o.currentName
 
+		Debug("Creating multipartupload for ", o.config.bucket, o.key)
 		params := &s3.CreateMultipartUploadInput{
 			Bucket: aws.String(o.config.bucket),
 			Key:    aws.String(o.key),
@@ -177,8 +178,7 @@ func (o *S3Output) Write(data []byte) (n int, err error) {
 
 		o.uploadID = *resp.UploadId
 
-		buf := bytes.NewBuffer(nil)
-		o.buffer = buf
+		o.buffer = bytes.NewBuffer(nil)
 
 		if strings.HasSuffix(o.key, ".gz") {
 			o.writer = gzip.NewWriter(o.buffer)
@@ -215,7 +215,10 @@ func (o *S3Output) flush() {
 		} else {
 			o.writer.(*bufio.Writer).Flush()
 		}
-		o.uploadPart()
+		err := o.uploadPart()
+		if err != nil {
+			panic(err)
+		}
 		o.chunkSize += o.buffer.Len()
 		o.buffer.Reset()
 	}
@@ -226,7 +229,7 @@ func (o *S3Output) String() string {
 }
 
 func (o *S3Output) Close() error {
-	if o.buffer != nil {
+	if o.uploadID != "" {
 		if strings.HasSuffix(o.key, ".gz") {
 			o.writer.(*gzip.Writer).Close()
 		} else {
@@ -241,6 +244,7 @@ func (o *S3Output) Close() error {
 		o.buffer.Reset()
 		o.chunkSize = 0
 
+		Debug("Completing multipartupload for ", o.key)
 		params := &s3.CompleteMultipartUploadInput{
 			Bucket:   aws.String(o.config.bucket),
 			Key:      aws.String(o.key),
@@ -248,6 +252,7 @@ func (o *S3Output) Close() error {
 		}
 
 		_, err = o.svc.CompleteMultipartUpload(params)
+		o.uploadID = ""
 		return err
 	}
 	return nil
@@ -255,6 +260,7 @@ func (o *S3Output) Close() error {
 
 func (o *S3Output) uploadPart() error {
 
+	Debug("Uploading part to S3")
 	params := &s3.UploadPartInput{
 		Bucket:   aws.String(o.config.bucket),
 		Key:      aws.String(o.key),

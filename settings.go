@@ -108,7 +108,7 @@ func init() {
 	flag.StringVar(&Settings.inputS3Config.bucket, "input-s3-bucket", "", "bucket to write data too")
 	flag.StringVar(&Settings.inputS3Config.region, "input-s3-region", "us-east-1", "AWS Region")
 
-	flag.Var(&Settings.outputS3, "output-s3", "Write incoming requests to s3: \n\tgor --input-raw :80 --output-s3 ./requests.gor")
+	flag.Var(&Settings.outputS3, "output-s3", "Write incoming requests to s3: \n\tgor --input-tcp :80 --output-s3 requests.gor")
 	flag.DurationVar(&Settings.outputS3Config.flushInterval, "output-s3-flush-interval", time.Second, "Interval for forcing buffer flush to the file, default: 1s.")
 	flag.StringVar(&Settings.outputS3Config.bucket, "output-s3-bucket", "", "bucket to write data too")
 	flag.StringVar(&Settings.outputS3Config.region, "output-s3-region", "us-east-1", "AWS Region")
