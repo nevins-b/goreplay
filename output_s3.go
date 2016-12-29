@@ -49,6 +49,7 @@ type S3Output struct {
 	uploadID       string
 	queueLength    int
 	chunkSize      int
+	partNumber     int64
 	buffer         *bytes.Buffer
 	writer         io.Writer
 	requestPerFile bool
@@ -164,6 +165,7 @@ func (o *S3Output) Write(data []byte) (n int, err error) {
 		o.mu.Lock()
 		o.Close()
 		o.key = o.currentName
+		o.partNumber = 0
 
 		Debug("Creating multipartupload for ", o.config.bucket, o.key)
 		params := &s3.CreateMultipartUploadInput{
@@ -238,6 +240,7 @@ func (o *S3Output) Close() error {
 
 		err := o.uploadPart()
 		if err != nil {
+			Debug("Failed to upload part!", err)
 			return err
 		}
 
@@ -253,6 +256,7 @@ func (o *S3Output) Close() error {
 
 		_, err = o.svc.CompleteMultipartUpload(params)
 		o.uploadID = ""
+		o.partNumber = 0
 		return err
 	}
 	return nil
@@ -262,11 +266,16 @@ func (o *S3Output) uploadPart() error {
 
 	Debug("Uploading part to S3")
 	params := &s3.UploadPartInput{
-		Bucket:   aws.String(o.config.bucket),
-		Key:      aws.String(o.key),
-		UploadId: aws.String(o.uploadID),
-		Body:     bytes.NewReader(o.buffer.Bytes()),
+		Bucket:     aws.String(o.config.bucket),
+		Key:        aws.String(o.key),
+		UploadId:   aws.String(o.uploadID),
+		Body:       bytes.NewReader(o.buffer.Bytes()),
+		PartNumber: aws.Int64(o.partNumber),
 	}
 	_, err := o.svc.UploadPart(params)
-	return err
+	if err != nil {
+		return err
+	}
+	o.partNumber++
+	return nil
 }
