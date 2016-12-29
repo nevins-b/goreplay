@@ -49,7 +49,7 @@ type S3Output struct {
 	uploadID       string
 	queueLength    int
 	chunkSize      int
-	partNumber     int64
+	parts          []*s3.CompletedPart
 	buffer         *bytes.Buffer
 	writer         io.Writer
 	requestPerFile bool
@@ -165,7 +165,7 @@ func (o *S3Output) Write(data []byte) (n int, err error) {
 		o.mu.Lock()
 		o.Close()
 		o.key = o.currentName
-		o.partNumber = 0
+		o.parts = []*s3.CompletedPart{}
 
 		Debug("Creating multipartupload for ", o.config.bucket, o.key)
 		params := &s3.CreateMultipartUploadInput{
@@ -252,11 +252,17 @@ func (o *S3Output) Close() error {
 			Bucket:   aws.String(o.config.bucket),
 			Key:      aws.String(o.key),
 			UploadId: aws.String(o.uploadID),
+			MultipartUpload: &s3.CompletedMultipartUpload{
+				Parts: o.parts,
+			},
 		}
 
 		_, err = o.svc.CompleteMultipartUpload(params)
+		if err != nil {
+			Debug("Failed to compelte upload!", err)
+		}
 		o.uploadID = ""
-		o.partNumber = 0
+		o.parts = []*s3.CompletedPart{}
 		return err
 	}
 	return nil
@@ -265,17 +271,22 @@ func (o *S3Output) Close() error {
 func (o *S3Output) uploadPart() error {
 
 	Debug("Uploading part to S3")
+	partNum := int64(len(o.parts) + 1)
 	params := &s3.UploadPartInput{
 		Bucket:     aws.String(o.config.bucket),
 		Key:        aws.String(o.key),
 		UploadId:   aws.String(o.uploadID),
 		Body:       bytes.NewReader(o.buffer.Bytes()),
-		PartNumber: aws.Int64(o.partNumber),
+		PartNumber: aws.Int64(partNum),
 	}
-	_, err := o.svc.UploadPart(params)
+	resp, err := o.svc.UploadPart(params)
 	if err != nil {
 		return err
 	}
-	o.partNumber++
+	comp := &s3.CompletedPart{
+		ETag:       resp.ETag,
+		PartNumber: aws.Int64(partNum),
+	}
+	o.parts = append(o.parts, comp)
 	return nil
 }
