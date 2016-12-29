@@ -211,7 +211,7 @@ func (o *S3Output) flush() {
 	defer o.mu.Unlock()
 	o.mu.Lock()
 
-	if o.buffer != nil {
+	if o.uploadID != "" {
 		if strings.HasSuffix(o.key, ".gz") {
 			o.writer.(*gzip.Writer).Flush()
 		} else {
